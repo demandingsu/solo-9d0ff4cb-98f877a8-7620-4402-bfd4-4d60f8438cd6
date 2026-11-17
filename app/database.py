@@ -10,7 +10,6 @@
 
 from __future__ import annotations
 
-import os
 import sqlite3
 import threading
 from contextlib import contextmanager
@@ -91,7 +90,10 @@ def snapshot(conn: sqlite3.Connection) -> Iterator[sqlite3.Connection]:
     conn.execute("BEGIN")
     try:
         yield conn
-    finally:
+    except BaseException:
+        conn.execute("ROLLBACK")
+        raise
+    else:
         conn.execute("COMMIT")
 
 
@@ -119,15 +121,16 @@ def get_active_revision(
     ).fetchone()
 
 
-def list_active_products(conn: sqlite3.Connection) -> list[sqlite3.Row]:
-    """所有成果号各自的现役（最高修订）行。"""
+def list_all_revisions(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    """读取全部修订（仅谱系评估所需列），供单快照批量评估一次装载。
+
+    调用方须在快照事务内调用；返回的行对象在游标关闭后仍可安全使用。
+    """
     return list(
         conn.execute(
-            "SELECT r.* FROM revisions r "
-            "JOIN (SELECT product_id, MAX(revision) AS max_rev "
-            "      FROM revisions GROUP BY product_id) m "
-            "  ON r.product_id = m.product_id AND r.revision = m.max_rev "
-            "ORDER BY r.product_id"
+            "SELECT product_id, revision, summary, "
+            "parent_product_id, parent_revision "
+            "FROM revisions"
         )
     )
 

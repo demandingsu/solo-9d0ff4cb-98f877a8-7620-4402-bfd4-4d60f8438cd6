@@ -163,15 +163,8 @@ def create_app(db_path: Optional[str] = None) -> FastAPI:
         conn: sqlite3.Connection = Depends(get_conn),
     ) -> list[ProductStatus]:
         with db.snapshot(conn):
-            active_rows = db.list_active_products(conn)
-            results = []
-            for row in active_rows:
-                if row["parent_product_id"] is None:
-                    continue  # 只列拼图（有父引用的成果）
-                status = lineage.evaluate(conn, row, start_is_active=True)
-                if deliverable is None or status["deliverable"] is deliverable:
-                    results.append(ProductStatus(**status))
-        return results
+            results = lineage.evaluate_active_mosaics(conn, deliverable)
+        return [ProductStatus(**status) for status in results]
 
     # ---------------- 修订追溯 ----------------
     @app.get(

@@ -15,6 +15,9 @@
   - `missing` 父项缺失（成果或修订从未提交）
   - `superseded` 父项已非现役（同成果号存在更高修订）
   - `cycle` 循环引用（引用链成环，含自引用）
+- **批量状态查询**：`GET /api/mosaics` 在单个快照事务内一次性装载修订表，
+  之后的评估全部为内存计算；共享父链只读取一次，链路结论按节点缓存，
+  数据库访问与重复计算都不随拼图数量增长（每条返回路径本身的长度除外）。
 - **整批拒收**：同号同修订但清单内容（摘要/父引用）不同时，整批拒绝、零写入，
   原有结论保持不变，并返回冲突明细；完全相同的重复提交按幂等处理。
 - **并发安全**：写事务 `BEGIN IMMEDIATE` 串行化；每次查询在单个 SQLite 快照事务内
@@ -28,9 +31,10 @@ app/
   main.py       FastAPI 路由与应用工厂
   schemas.py    Pydantic 请求/响应模型（中文 Schema 说明）
   database.py   SQLite 连接、显式事务、整批原子提交
-  lineage.py    谱系评估（缺失/退役/环检测与引用路径）
+  lineage.py    谱系评估（缺失/退役/环检测与引用路径，批量共享缓存）
 tests/
-  test_api.py   18 个端到端关键情形自测
+  test_api.py          基础端到端关键情形自测
+  test_mosaic_batch.py 批量查询性能、长链/环路径与交错提交自测
 Dockerfile
 docker-compose.yml
 requirements.txt
